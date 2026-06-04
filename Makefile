@@ -22,7 +22,14 @@ Lib/CMSIS/src/system_stm32f4xx.c
 ASM_SOURCES =  \
 Startup/startup_stm32f407xx.s
 
-GCC_PATH = ~/soft/gcc-arm-none-eabi/bin
+# Toolchain: make GCC_PATH=... to override.
+# Homebrew arm-none-eabi-gcc is built without newlib headers; prefer ARM GNU Toolchain in /opt.
+ARM_GNU_TOOLCHAIN := $(firstword $(wildcard /opt/arm-gnu-toolchain-*/bin))
+ifndef GCC_PATH
+ifneq ($(ARM_GNU_TOOLCHAIN),)
+GCC_PATH := $(ARM_GNU_TOOLCHAIN)
+endif
+endif
 
 PREFIX = arm-none-eabi-
 ifdef GCC_PATH
