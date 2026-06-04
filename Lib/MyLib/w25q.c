@@ -66,10 +66,6 @@ static void w25q_page_write(uint8_t *data, uint32_t addr, uint16_t count)
 		count = W25Q_PageSize;
 	}
 
-	if (count == W25Q_PageSize) {
-		addr &= 0xFFFF00U;
-	}
-
 	qspi_cmd_addr_write(W25X_PageProgram, addr, data, count);
 	w25q_wait();
 }

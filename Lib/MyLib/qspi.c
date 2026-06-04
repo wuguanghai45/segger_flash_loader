@@ -1,5 +1,6 @@
 #include "qspi.h"
 #include "stm32l4xx.h"
+#include "w25q.h"
 
 #define QSPI_AF10 0xAU
 #define QSPI_PRESCALER 3U /* HCLK 80MHz / (3+1) = 20MHz */
@@ -165,6 +166,27 @@ void qspi_cmd_addr_write(uint8_t cmd, uint32_t addr, const uint8_t *buf, uint32_
 		*(__IO uint8_t *)&QUADSPI->DR = buf[i];
 	}
 	qspi_wait_tc();
+}
+
+void qspi_enter_memory_mapped(void)
+{
+	uint32_t ccr;
+
+	qspi_abort();
+
+	/* Standard read (0x03), 24-bit address, memory-mapped at 0x90000000 */
+	ccr = W25X_ReadData;
+	ccr |= QUADSPI_CCR_IMODE_0;
+	ccr |= QUADSPI_CCR_ADMODE_0 | QUADSPI_CCR_ADSIZE_1;
+	ccr |= QUADSPI_CCR_FMODE_0 | QUADSPI_CCR_FMODE_1;
+
+	QUADSPI->DLR = 0;
+	QUADSPI->CCR = ccr;
+}
+
+void qspi_exit_memory_mapped(void)
+{
+	qspi_abort();
 }
 
 uint8_t qspi_tx_rx_byte(uint8_t data, uint8_t read)

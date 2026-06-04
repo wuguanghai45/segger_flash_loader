@@ -75,6 +75,6 @@
   TimeoutVerify = 0x00002710
   VerifyType = 1
 [PERFORMANCE]
-  DisableSkipBlankDataOnProgram = 0x00000000
+  DisableSkipBlankDataOnProgram = 0x00000001
   PerfromBlankCheckPriorEraseChip = 0x00000001
   PerfromBlankCheckPriorEraseSelectedSectors = 0x00000001

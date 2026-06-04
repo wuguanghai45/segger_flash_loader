@@ -49,6 +49,8 @@ Device name in J-Flash: **ST L431RC_W25Q16**, flash bank **SPI Flash**.
 
 **Note:** Halt the target before programming so application code does not use QSPI at the same time.
 
+If partial partition programming fails verification, check RTT logs: erase addresses should step by 4 KB from the partition base (e.g. `0x901C2000` for image-1). A manual full chip erase should no longer be required after the loader erase fix.
+
 ## J-Flash CLI example
 
 ```bash
@@ -59,7 +61,7 @@ RTT logs are available via J-Link RTT Viewer during flash operations.
 
 ## Loader requirements
 
-- Implements `SEGGER_FL_Prepare`, `Restore`, `Program`, `Erase`, and `Read` (external flash)
+- Implements `SEGGER_FL_Prepare`, `Restore`, `Program`, `Erase`, `CheckBlank`, and `Read` (external flash)
 - `FlashDevice` descriptor in `DevDscr` section
 - Linker sections: `PrgCode` → code/rodata → `PrgData` → data → `DevDscr`
 
