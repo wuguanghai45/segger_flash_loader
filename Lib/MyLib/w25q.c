@@ -1,139 +1,95 @@
 #include "w25q.h"
-static void w25q_page_write(uint8_t* data, uint32_t addr, uint16_t count);
+
+static void w25q_page_write(uint8_t *data, uint32_t addr, uint16_t count);
 static void w25q_wait(void);
 static void w25q_write_en(void);
 
-void w25q_init(void){
-    spi1_init();
+void w25q_init(void)
+{
+	qspi_init();
 }
 
+uint32_t w25q_read_jedec_id(void)
+{
+	uint8_t id[3];
 
-uint16_t w25q_read_id(void){
-  uint16_t id;
-  
-  SPI1_CS_LOW;
-  spi1_send(W25X_ManufactDeviceID,1);
-  spi1_send(0x00,1);
-  spi1_send(0x00,1);
-  spi1_send(0x00,1);
-  
-  id = spi1_send(0xFF,1) << 8;
-  id |= spi1_send(0xFF,1);
-
-  SPI1_CS_HI;
-  return id;
+	qspi_cmd_read(W25X_JedecDeviceID, id, 3);
+	return ((uint32_t)id[0] << 16) | ((uint32_t)id[1] << 8) | id[2];
 }
 
-void w25q_read(uint8_t* data, uint32_t addr, uint32_t count) {
-  SPI1_CS_LOW;
+uint16_t w25q_read_id(void)
+{
+	uint8_t id[2];
 
-  spi1_send(W25X_ReadData,1);
-
-  spi1_send((addr & 0xFF0000) >> 16,1);
-  spi1_send((addr & 0xFF00) >> 8,1);
-  spi1_send(addr & 0xFF,1);
-
-  while (count--) { 
-      *data = spi1_send(0xFF,1);
-      data++;
-    }
-
-  SPI1_CS_HI;
+	qspi_cmd_addr_read(W25X_ManufactDeviceID, 0, id, 2);
+	return ((uint16_t)id[0] << 8) | id[1];
 }
 
-void w25q_write(uint8_t* data, uint32_t addr, uint32_t count){
-
-  while(count){
-    if(count > W25Q_PageSize){
-      w25q_page_write(data,addr,W25Q_PageSize);
-      count -= W25Q_PageSize;
-      data += W25Q_PageSize;
-      addr += W25Q_PageSize;
-    }else{
-      w25q_page_write(data,addr,count);
-      count = 0;
-    }
-  }
-
+void w25q_read(uint8_t *data, uint32_t addr, uint32_t count)
+{
+	qspi_cmd_addr_read(W25X_ReadData, addr, data, count);
 }
 
-/*
-Удаляет блок указанного размера, который включает байт с указанным адресом.
-*/
-void w25q_erase(uint32_t addr, enum w25q_erase_modes mode){
+void w25q_write(uint8_t *data, uint32_t addr, uint32_t count)
+{
+	while (count) {
+		uint32_t chunk = count;
 
-  w25q_write_en();
-  
-  SPI1_CS_LOW;
-
-  spi1_send(mode,1);
-
-  if(mode != W25Q_ERASE_CHIP){
-    spi1_send((addr & 0xFF0000) >> 16,0);
-    spi1_send((addr & 0xFF00) >> 8,0);
-    spi1_send(addr & 0xFF,0);
-  }
-
-  SPI1_CS_HI;
-
-  w25q_wait();
+		if (chunk > W25Q_PageSize) {
+			chunk = W25Q_PageSize;
+		}
+		w25q_page_write(data, addr, (uint16_t)chunk);
+		count -= chunk;
+		data += chunk;
+		addr += chunk;
+	}
 }
 
-static void w25q_page_write(uint8_t* data, uint32_t addr, uint16_t count) {
+void w25q_erase(uint32_t addr, enum w25q_erase_modes mode)
+{
+	w25q_write_en();
 
-  w25q_write_en();
+	if (mode == W25Q_ERASE_CHIP) {
+		qspi_cmd_only((uint8_t)mode);
+	} else {
+		qspi_cmd_addr_only((uint8_t)mode, addr);
+	}
 
-  if(count > W25Q_PageSize){
-    count = W25Q_PageSize;
-  }
-
-  if(count == W25Q_PageSize){
-    addr &= 0xFFFF00;
-  }
-
-  SPI1_CS_LOW;
-  spi1_send(W25X_PageProgram,0);
-  spi1_send((addr & 0xFF0000) >> 16,0);
-  spi1_send((addr & 0xFF00) >> 8,0);
-  spi1_send(addr & 0xFF,0);
-
-
-  while (count--) {
-    spi1_send(*data,0);
-    data++;
-  }
-
-  SPI1_CS_HI;
-  w25q_wait();
+	w25q_wait();
 }
 
+static void w25q_page_write(uint8_t *data, uint32_t addr, uint16_t count)
+{
+	w25q_write_en();
 
-static void w25q_write_en(void){
-  uint8_t status;
+	if (count > W25Q_PageSize) {
+		count = W25Q_PageSize;
+	}
 
-  SPI1_CS_LOW;
-  spi1_send(W25X_WriteEnable,1);
-  SPI1_CS_HI;
+	if (count == W25Q_PageSize) {
+		addr &= 0xFFFF00U;
+	}
 
-  SPI1_CS_LOW;
-  spi1_send(W25X_ReadStatusReg,1);
-
-  do
-    status = spi1_send(0xFF,0);
-  while ((status & 0x02) == 0);
-  
-  SPI1_CS_HI;
+	qspi_cmd_addr_write(W25X_PageProgram, addr, data, count);
+	w25q_wait();
 }
 
-static void w25q_wait(void){
-  uint8_t status = 0;
+static void w25q_write_en(void)
+{
+	uint8_t status;
 
-  SPI1_CS_LOW;
-  spi1_send(W25X_ReadStatusReg,1);
+	qspi_cmd_only(W25X_WriteEnable);
 
-  do
-    status = spi1_send(0xFF,0);
-  while (status & 0x01);
+	do {
+		qspi_cmd_addr_read(W25X_ReadStatusReg, 0, &status, 1);
+	} while ((status & 0x02U) == 0U);
+}
 
-  SPI1_CS_HI;
+static void w25q_wait(void)
+{
+	uint8_t status;
+
+	do {
+		qspi_cmd_addr_read(W25X_ReadStatusReg, 0, &status, 1);
+	} while (status & 0x01U);
 }

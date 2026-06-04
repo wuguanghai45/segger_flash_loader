@@ -1,40 +1,66 @@
-# Пример использования Segger Flash Loader
+# SEGGER Flash Loader for STM32L431RC + W25Q16JV
 
-Пример прошивки внешней флеш памяти при помощи [Segger Flash Loader](https://wiki.segger.com/SEGGER_Flash_Loader). В данном примере используется плата [MCUDev DevEBox STM32F407VGT6](https://github.com/mcauser/MCUDEV_DEVEBOX_F407VGT6)
+Open Flash Loader example for external NOR flash via QUADSPI on **STM32L431RC** (HC AllCANLED), using [SEGGER Flash Loader](https://wiki.segger.com/SEGGER_Flash_Loader).
 
-![MCUDev DevEBox STM32F407VGT6](./img/STM32F407VGT6.jpg)
+## Hardware
 
-На плате установлена flash память [W25Q16](./doc/w25q16jv%20spi%20revd%2008122016.pdf). Память подключена к SPI1 (PB3 SCK, PB5 MOSI, PB4 MISO, PA15 CS).
+- MCU: STM32L431RC (Cortex-M4, 64 KB SRAM)
+- Flash: Winbond W25Q16JV (16 Mbit / 2 MB) on QUADSPI bank 1
+- Clock (matches Zephyr DTS): **HSI16 + PLL** → 80 MHz SYSCLK, QSPI max **20 MHz**
 
-Для прошивки flash памяти используется технология загружаемого в RAM микроконтроллера кода, который взаимодействует с отладчиком (J-Link) и осуществляет все операции с памятью. 
+| QSPI signal | Pin |
+|-------------|-----|
+| CLK | PB10 |
+| NCS | PB11 |
+| IO0 | PB1 |
+| IO1 | PB0 |
+| IO2 | PA7 |
+| IO3 | PA6 |
 
-Загрузчик должен соотвествовать нескольким требованиям:
+## External flash partitions (virtual base `0x90000000`)
 
-* Должны быть реализованы несколько обязательных функций (SEGGER_FL_Prepare(), SEGGER_FL_Restore(), SEGGER_FL_Program(), SEGGER_FL_Erase()). Для памяти, которая не отображается в адресное пространство МК надо так же реализовать SEGGER_FL_Read()
-* Должна присутствовать структура struct FlashDevice с описанием используемой памяти
-* Расположение секций в elf файле должно соответствовать схеме:
+| Label | Offset | Size |
+|-------|--------|------|
+| lfs1 | 0x000000 | 1800 KB |
+| image-1 | 0x1C2000 | 200 KB |
+| storage | 0x1F4000 | 40 KB |
+| settings | 0x1FE000 | 8 KB |
 
-```
-section PrgCode                     // Marks the start of the SFL. Must be the very first section
-sections .text, .rodata, ...        // In any order
-section PrgData                     // Marks the end of the code + rodata region (functions, const data, ...) and the start of the data region (static + global variables)
-sections .textrw, .data, .fast, ... // In any order
-section DevDscr                     // Marks the location of the <FlashDevice> structure variable and also the end of the loader. Must(!!!) be the very last section
-```
+## Build
 
-После сборки прошивки, для использования загрузчика в JFlash надо создать xml файл с описанием. Полное описание доступно на странице [J-Link Device Support Kit](https://wiki.segger.com/J-Link_Device_Support_Kit). Файл с описанием надо расположить:
-
-```
-Windows: C:\Users\<USER>\AppData\Roaming\SEGGER\JLinkDevices
-Linux: $HOME/.config/SEGGER/JLinkDevices
-```
-Пример файла находится в папке JFlash. В данном случае target назван F407WQ25, а Flash Bank - "SPI Flash". Из JFlash можно протестировать чтение, стирание и запись во флеш. В прошивке включены отладочные сообщения в RTT, их можно смотреть во время работы с флеш памятью через JLinkRTTViewer.
-
-Кроме интерактивного режима, JFlash так же поддерживает работу из командной строки. Полное описание всех параметров в [J-Flash User guide](https://www.segger.com/downloads/flasher/UM08003). Пример загрузки файла во флеш из командной строки:
-
-```
-JFlash -openprj Jflash/stm32f407.jflash -production -exit
-
+```bash
+make clean && make
 ```
 
-Путь к загружаемому файлу, адрес загрузки и остальные параметры указаны в проекте Jflash/stm32f407.jflash. Их так же можно указать в командной строке.
+Output: `build/firmware.elf` (copy next to `Devices.xml` for J-Link).
+
+## J-Link device pack
+
+Install device description:
+
+```
+Linux/macOS: $HOME/.config/SEGGER/JLinkDevices/ST/L431RC_W25Q16/
+Windows:     %APPDATA%\SEGGER\JLinkDevices\ST\L431RC_W25Q16\
+```
+
+Copy `Jflash/.config/SEGGER/JLinkDevices/ST/L431RC_W25Q16/Devices.xml` and `build/firmware.elf` into that folder.
+
+Device name in J-Flash: **ST L431RC_W25Q16**, flash bank **SPI Flash**.
+
+**Note:** Halt the target before programming so application code does not use QSPI at the same time.
+
+## J-Flash CLI example
+
+```bash
+JFlash -openprj Jflash/stm32l431.jflash -production -exit
+```
+
+RTT logs are available via J-Link RTT Viewer during flash operations.
+
+## Loader requirements
+
+- Implements `SEGGER_FL_Prepare`, `Restore`, `Program`, `Erase`, and `Read` (external flash)
+- `FlashDevice` descriptor in `DevDscr` section
+- Linker sections: `PrgCode` → code/rodata → `PrgData` → data → `DevDscr`
+
+See [J-Link Device Support Kit](https://wiki.segger.com/J-Link_Device_Support_Kit) for XML details.

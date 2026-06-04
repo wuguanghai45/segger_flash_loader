@@ -3,7 +3,7 @@
 [GENERAL]
   aATEModuleSel[24] = 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
   ConnectMode = 0
-  CurrentFile = "/home/sergey/Projects/STM32/F407/Segger_Loader/build/firmware.bin"
+  CurrentFile = "build/firmware.bin"
   DataFileSAddr = 0x90000000
   GUIMode = 0
   HostName = ""
@@ -32,14 +32,14 @@
   UseScriptFile = 0
   ScriptFile = ""
   RAMAddr = 0x20000000
-  RAMSize = 0x00008000
+  RAMSize = 0x00010000
   CheckCoreID = 0
   CoreID = 0x00000000
   CoreIDMask = 0x0F000FFF
   UseAutoSpeed = 0x00000001
   ClockSpeed = 0x00000000
   EndianMode = 0
-  ChipName = "ST F407WQ25"
+  ChipName = "ST L431RC_W25Q16"
 [FLASH]
   aRangeSel[1] = 0-511
   BankName = "SPI Flash"
